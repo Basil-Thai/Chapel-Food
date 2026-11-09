@@ -46,6 +46,9 @@ label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
 .review b{color:var(--chili)}
 .photos{display:flex;gap:6px;overflow-x:auto;margin-top:8px}
 .photos img{height:110px;border-radius:8px;display:block}
+.note{font-size:.85rem;background:var(--white);border-left:4px solid var(--gold);padding:8px 10px;border-radius:6px;margin-top:12px}
+.agree{display:flex;gap:8px;align-items:flex-start;font-weight:500;margin-top:8px}
+.agree input{width:auto;margin-top:4px}
 .status{min-height:1.3em;margin:10px 0 0;font-weight:600;color:var(--chili)}
 .empty{text-align:center;padding:32px 12px;color:#4d6460}
 body.picking .fab{display:none}
@@ -93,12 +96,13 @@ body.picking #hint{display:block}
   <label for="aName">Your name</label>
   <input id="aName" maxlength="40" placeholder="Optional">
   <div class="row">
-    <div><label for="aRating">Your rating</label><select id="aRating" required><option value="">Choose</option><option value="5">5 Excellent</option><option value="4">4 Very good</option><option value="3">3 Fine</option><option value="2">2 Poor</option><option value="1">1 Avoid</option></select></div>
+    <div><label for="aRating">Your rating</label><select id="aRating" required><option value="">Choose</option><option value="4">4 Excellent</option><option value="3">3 Very good</option><option value="2">2 Good</option><option value="1">1 Average</option></select></div>
   </div>
   <label for="aComment">What did you eat?</label>
   <textarea id="aComment" rows="3" maxlength="1000" placeholder="Dishes, what was good, what to skip"></textarea>
   <label for="aPhotos">Photos (up to 4)</label>
   <input id="aPhotos" type="file" accept="image/*" multiple>
+  <div class="note">Review the food and service only. Do not name or insult individuals. Thai law treats defamation as a crime, and a true statement is not always a defence.</div><label class="agree"><input type="checkbox" required id="aAgree"> I will keep this review fair and factual.</label>
   <div class="status" id="addStatus" role="status"></div>
   <div class="actions"><button type="button" class="btn alt" data-close>Cancel</button><button class="btn" id="addSubmit">Save place</button></div>
 </form></dialog>
@@ -134,7 +138,7 @@ CUISINES.forEach(c => {
 try { $('#aName').value = localStorage.getItem('author') || ''; } catch (e) {}
 
 const avg = p => { const r = p.reviews || []; return r.length ? r.reduce((a, x) => a + x.rating, 0) / r.length : 0; };
-const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+const stars = n => '★'.repeat(n) + '☆'.repeat(4 - n);
 const price = n => '฿'.repeat(n || 1);
 
 async function load() {
@@ -177,10 +181,11 @@ function openDetail(id) {
     <form id="revForm" data-id="${p.id}">
       <h3 style="margin-top:16px">Add your review</h3>
       <label for="rAuthor">Your name</label><input id="rAuthor" maxlength="40" placeholder="Optional" value="${esc($('#aName').value)}">
-      <label for="rRating">Rating</label><select id="rRating" required><option value="">Choose</option><option value="5">5 Excellent</option><option value="4">4 Very good</option><option value="3">3 Fine</option><option value="2">2 Poor</option><option value="1">1 Avoid</option></select>
+      <label for="rRating">Rating</label><select id="rRating" required><option value="">Choose</option><option value="4">4 Excellent</option><option value="3">3 Very good</option><option value="2">2 Good</option><option value="1">1 Average</option></select>
       <label for="rComment">What did you eat?</label><textarea id="rComment" rows="3" maxlength="1000"></textarea>
       <label for="rPhotos">Photos (up to 4)</label><input id="rPhotos" type="file" accept="image/*" multiple>
-      <div class="status" id="revStatus" role="status"></div>
+      <div class="note">Review the food and service only. Do not name or insult individuals. Thai law treats defamation as a crime, and a true statement is not always a defence.</div><label class="agree"><input type="checkbox" required id="rAgree"> I will keep this review fair and factual.</label>
+  <div class="status" id="revStatus" role="status"></div>
       <div class="actions"><button type="button" class="btn alt" data-close>Close</button><button class="btn" id="revSubmit">Post review</button></div>
     </form>`;
   $('#detailDlg').showModal();
