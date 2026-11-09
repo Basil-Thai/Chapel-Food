@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phang Nga Eats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--sea:#0f3d3e;--mist:#e9f0ee;--chili:#c9331c;--gold:#e6a817;--ink:#16262a;--line:#c9d8d4;--white:#fff}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:16px/1.45 "Instrument Sans",system-ui,sans-serif;color:var(--ink);background:var(--mist);display:flex;flex-direction:column}
+h1,h2,h3{font-family:"Bricolage Grotesque",Georgia,serif;margin:0;line-height:1.15}
+header{background:var(--sea);color:var(--white);padding:12px 16px 0}
+header h1{font-size:1.5rem}
+header p{margin:2px 0 10px;font-size:.85rem;opacity:.8}
+.tabs{display:flex;gap:4px}
+.tabs button{flex:1;border:0;background:transparent;color:#bcd3cf;font:600 .95rem inherit;font-family:inherit;padding:10px;border-bottom:3px solid transparent;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--white);border-color:var(--gold)}
+main{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0}
+#list{position:absolute;inset:0;overflow:auto;padding:12px 16px 96px;display:none}
+.filters{display:flex;gap:8px;margin-bottom:12px}
+input,select,textarea{font:inherit;color:inherit;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--white);width:100%}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+.card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;display:flex;gap:12px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit}
+.card h3{font-size:1.05rem}
+.card small{color:#4d6460}
+.score{flex:none;width:44px;height:44px;border-radius:50%;background:var(--gold);color:var(--sea);font:700 1.05rem "Bricolage Grotesque",sans-serif;display:grid;place-items:center}
+.pin{width:34px;height:34px;border-radius:50%;background:var(--gold);color:var(--sea);border:2.5px solid var(--sea);font:700 .8rem "Bricolage Grotesque",sans-serif;display:grid;place-items:center;box-shadow:0 2px 6px #0004}
+.fab{position:fixed;right:16px;bottom:20px;z-index:500;background:var(--chili);color:var(--white);border:0;border-radius:999px;padding:14px 20px;font:600 1rem inherit;font-family:inherit;box-shadow:0 4px 14px #0005;cursor:pointer}
+.btn{background:var(--sea);color:var(--white);border:0;border-radius:8px;padding:11px 16px;font:600 1rem inherit;font-family:inherit;cursor:pointer}
+.btn.alt{background:var(--white);color:var(--sea);border:1.5px solid var(--sea)}
+.btn[disabled]{opacity:.55}
+dialog{border:0;padding:0;width:min(560px,100%);max-height:92dvh;margin:auto auto 0;border-radius:16px 16px 0 0;background:var(--mist);color:var(--ink)}
+dialog::backdrop{background:#0f3d3e99}
+@media(min-width:700px){dialog{margin:auto;border-radius:16px}}
+.sheet{padding:18px 16px 24px;overflow:auto;max-height:92dvh}
+.sheet h2{font-size:1.4rem;margin-bottom:4px}
+label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.actions{display:flex;gap:10px;margin-top:16px}
+.review{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
+.review b{color:var(--chili)}
+.photos{display:flex;gap:6px;overflow-x:auto;margin-top:8px}
+.photos img{height:110px;border-radius:8px;display:block}
+.status{min-height:1.3em;margin:10px 0 0;font-weight:600;color:var(--chili)}
+.empty{text-align:center;padding:32px 12px;color:#4d6460}
+body.picking .fab{display:none}
+#hint{position:absolute;z-index:600;left:50%;top:12px;transform:translateX(-50%);background:var(--sea);color:var(--white);padding:9px 14px;border-radius:999px;font-weight:600;display:none}
+body.picking #hint{display:block}
+.setup{background:var(--gold);color:var(--ink);padding:10px 16px;font-weight:600;display:none}
+@media(prefers-reduced-motion:no-preference){dialog[open]{animation:up .2s ease-out}@keyframes up{from{transform:translateY(24px);opacity:0}}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phang Nga Eats</h1>
+  <p>Places to eat from Khok Kloi to Khao Lak, logged by people who went</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabMap" aria-selected="true">Map</button>
+    <button role="tab" id="tabList" aria-selected="false">List</button>
+  </div>
+</header>
+<div class="setup" id="setup">Not connected yet. Add your Supabase URL and key in index.html (see README).</div>
+<main>
+  <div id="map"></div>
+  <div id="hint">Tap the map to place the pin</div>
+  <section id="list">
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search name or cuisine" aria-label="Search">
+      <select id="cuisineFilter" aria-label="Filter by cuisine"><option value="">All cuisines</option></select>
+      <select id="sort" aria-label="Sort"><option value="rating">Top rated</option><option value="new">Newest</option></select>
+    </div>
+    <div id="cards"></div>
+  </section>
+</main>
+<button class="fab" id="addBtn">Add a place</button>
+
+<dialog id="addDlg"><form class="sheet" id="addForm">
+  <h2>Add a place</h2>
+  <label for="pName">Restaurant name</label>
+  <input id="pName" required maxlength="80">
+  <div class="row">
+    <div><label for="pCuisine">Cuisine</label><select id="pCuisine"></select></div>
+    <div><label for="pPrice">Price</label><select id="pPrice"><option value="1">฿ cheap</option><option value="2" selected>฿฿ mid</option><option value="3">฿฿฿ pricey</option></select></div>
+  </div>
+  <label>Location</label>
+  <div class="row"><button type="button" class="btn alt" id="gps">Use my location</button><button type="button" class="btn alt" id="pick">Pick on map</button></div>
+  <div class="status" id="pinStatus" style="color:var(--sea)">No pin set</div>
+  <label for="aName">Your name</label>
+  <input id="aName" maxlength="40" placeholder="Optional">
+  <div class="row">
+    <div><label for="aRating">Your rating</label><select id="aRating" required><option value="">Choose</option><option value="5">5 Excellent</option><option value="4">4 Very good</option><option value="3">3 Fine</option><option value="2">2 Poor</option><option value="1">1 Avoid</option></select></div>
+  </div>
+  <label for="aComment">What did you eat?</label>
+  <textarea id="aComment" rows="3" maxlength="1000" placeholder="Dishes, what was good, what to skip"></textarea>
+  <label for="aPhotos">Photos (up to 4)</label>
+  <input id="aPhotos" type="file" accept="image/*" multiple>
+  <div class="status" id="addStatus" role="status"></div>
+  <div class="actions"><button type="button" class="btn alt" data-close>Cancel</button><button class="btn" id="addSubmit">Save place</button></div>
+</form></dialog>
+
+<dialog id="detailDlg"><div class="sheet" id="detailBody"></div></dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ---- Settings: paste yours from Supabase > Project Settings > API ----
+const SUPABASE_URL = 'https://zeswryqeysozzvyisoxf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inplc3dyeXFleXNvenp2eWlzb3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMDQ3OTcsImV4cCI6MjEwOTc4MDc5N30.q4tP1Z_vGZgXNKTdnSAYOkPF0JvVQ6NLNz8FOQzRTag';
+// ----------------------------------------------------------------------
+const CUISINES = ['Thai','Southern Thai','Seafood','Noodles','Street food','Cafe','Western','Indian','Bakery','Other'];
+const configured = !SUPABASE_URL.startsWith('PASTE');
+const sb = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let places = [], draft = null, picking = false, draftMarker = null;
+
+if (!configured) $('#setup').style.display = 'block';
+
+// Map: Khok Kloi (south) to Khao Lak (north), Thai Mueang in the middle
+const map = L.map('map', {zoomControl: true});
+map.fitBounds([[8.18, 98.20], [8.72, 98.36]]);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
+const markers = L.layerGroup().addTo(map);
+
+CUISINES.forEach(c => {
+  $('#pCuisine').insertAdjacentHTML('beforeend', `<option>${c}</option>`);
+  $('#cuisineFilter').insertAdjacentHTML('beforeend', `<option>${c}</option>`);
+});
+try { $('#aName').value = localStorage.getItem('author') || ''; } catch (e) {}
+
+const avg = p => { const r = p.reviews || []; return r.length ? r.reduce((a, x) => a + x.rating, 0) / r.length : 0; };
+const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+const price = n => '฿'.repeat(n || 1);
+
+async function load() {
+  if (!sb) return;
+  const { data, error } = await sb.from('places').select('*, reviews(*)').order('created_at', { ascending: false });
+  if (error) { console.error(error); return; }
+  places = data; render();
+}
+
+function render() {
+  markers.clearLayers();
+  places.forEach(p => {
+    const a = avg(p);
+    L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: `<div class="pin">${a ? a.toFixed(1) : '-'}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] }) })
+      .on('click', () => { if (!picking) openDetail(p.id); }).addTo(markers);
+  });
+  const q = $('#q').value.trim().toLowerCase(), cf = $('#cuisineFilter').value;
+  let rows = places.filter(p => (!cf || p.cuisine === cf) && (!q || (p.name + ' ' + (p.cuisine || '')).toLowerCase().includes(q)));
+  rows.sort($('#sort').value === 'new' ? (a, b) => b.created_at.localeCompare(a.created_at) : (a, b) => avg(b) - avg(a));
+  $('#cards').innerHTML = rows.length ? rows.map(p => {
+    const n = (p.reviews || []).length;
+    return `<button class="card" data-id="${p.id}"><span class="score">${avg(p) ? avg(p).toFixed(1) : '-'}</span><span><h3>${esc(p.name)}</h3><small>${esc(p.cuisine || 'Restaurant')}, ${price(p.price)}, ${n} review${n === 1 ? '' : 's'}</small></span></button>`;
+  }).join('') : `<div class="empty">${places.length ? 'No places match.' : 'No places yet. Add the first one.'}</div>`;
+}
+
+function reviewHTML(r) {
+  const ph = (r.photos || []).length ? `<div class="photos">${r.photos.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Food photo" loading="lazy"></a>`).join('')}</div>` : '';
+  return `<div class="review"><b>${stars(r.rating)}</b> <small>${esc(r.author || 'Anonymous')}, ${new Date(r.created_at).toLocaleDateString()}</small><div>${esc(r.comment)}</div>${ph}</div>`;
+}
+
+function openDetail(id) {
+  const p = places.find(x => x.id === id); if (!p) return;
+  const rs = [...(p.reviews || [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  $('#detailBody').innerHTML = `
+    <h2>${esc(p.name)}</h2>
+    <small>${esc(p.cuisine || 'Restaurant')}, ${price(p.price)}, ${avg(p) ? avg(p).toFixed(1) + ' average' : 'not rated yet'}</small>
+    <p><a href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=18/${p.lat}/${p.lng}" target="_blank" rel="noopener">Open in OpenStreetMap</a>
+    &nbsp; <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">Directions</a></p>
+    ${rs.map(reviewHTML).join('') || '<div class="empty">No reviews yet.</div>'}
+    <form id="revForm" data-id="${p.id}">
+      <h3 style="margin-top:16px">Add your review</h3>
+      <label for="rAuthor">Your name</label><input id="rAuthor" maxlength="40" placeholder="Optional" value="${esc($('#aName').value)}">
+      <label for="rRating">Rating</label><select id="rRating" required><option value="">Choose</option><option value="5">5 Excellent</option><option value="4">4 Very good</option><option value="3">3 Fine</option><option value="2">2 Poor</option><option value="1">1 Avoid</option></select>
+      <label for="rComment">What did you eat?</label><textarea id="rComment" rows="3" maxlength="1000"></textarea>
+      <label for="rPhotos">Photos (up to 4)</label><input id="rPhotos" type="file" accept="image/*" multiple>
+      <div class="status" id="revStatus" role="status"></div>
+      <div class="actions"><button type="button" class="btn alt" data-close>Close</button><button class="btn" id="revSubmit">Post review</button></div>
+    </form>`;
+  $('#detailDlg').showModal();
+}
+
+async function shrink(file) {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+}
+async function uploadPhotos(files) {
+  const urls = [];
+  for (const f of [...files].slice(0, 4)) {
+    const path = crypto.randomUUID() + '.jpg';
+    const { error } = await sb.storage.from('photos').upload(path, await shrink(f), { contentType: 'image/jpeg' });
+    if (error) throw error;
+    urls.push(sb.storage.from('photos').getPublicUrl(path).data.publicUrl);
+  }
+  return urls;
+}
+const rememberName = n => { try { localStorage.setItem('author', n); } catch (e) {} };
+
+// Tabs
+function setTab(t) {
+  $('#tabMap').setAttribute('aria-selected', t === 'map'); $('#tabList').setAttribute('aria-selected', t === 'list');
+  $('#list').style.display = t === 'list' ? 'block' : 'none';
+  if (t === 'map') map.invalidateSize();
+}
+$('#tabMap').onclick = () => setTab('map'); $('#tabList').onclick = () => setTab('list');
+['input', 'change'].forEach(ev => ['#q', '#cuisineFilter', '#sort'].forEach(s => $(s).addEventListener(ev, render)));
+$('#cards').onclick = e => { const c = e.target.closest('.card'); if (c) openDetail(c.dataset.id); };
+document.addEventListener('click', e => { if (e.target.closest('[data-close]')) e.target.closest('dialog').close(); });
+
+// Pin placement
+function setDraft(lat, lng) {
+  draft = { lat: +lat.toFixed(6), lng: +lng.toFixed(6) };
+  $('#pinStatus').textContent = `Pin set at ${draft.lat}, ${draft.lng}`;
+  if (draftMarker) draftMarker.remove();
+  draftMarker = L.marker([lat, lng]).addTo(map);
+}
+$('#addBtn').onclick = () => $('#addDlg').showModal();
+$('#gps').onclick = () => {
+  $('#pinStatus').textContent = 'Finding you...';
+  navigator.geolocation ? navigator.geolocation.getCurrentPosition(
+    pos => { setDraft(pos.coords.latitude, pos.coords.longitude); map.setView([draft.lat, draft.lng], 17); },
+    () => { $('#pinStatus').textContent = 'Location blocked. Use Pick on map instead.'; }, { enableHighAccuracy: true, timeout: 15000 })
+    : ($('#pinStatus').textContent = 'No GPS here. Use Pick on map instead.');
+};
+$('#pick').onclick = () => { $('#addDlg').close(); setTab('map'); picking = true; document.body.classList.add('picking'); };
+map.on('click', e => {
+  if (!picking) return;
+  picking = false; document.body.classList.remove('picking');
+  setDraft(e.latlng.lat, e.latlng.lng); $('#addDlg').showModal();
+});
+
+// Save a new place with its first review
+$('#addForm').onsubmit = async e => {
+  e.preventDefault();
+  const st = $('#addStatus'); st.textContent = '';
+  if (!sb) { st.textContent = 'App is not connected to Supabase yet.'; return; }
+  if (!draft) { st.textContent = 'Set the location first.'; return; }
+  $('#addSubmit').disabled = true; st.style.color = 'var(--sea)'; st.textContent = 'Saving...';
+  try {
+    const photos = await uploadPhotos($('#aPhotos').files);
+    const { data: pl, error } = await sb.from('places').insert({ name: $('#pName').value.trim(), cuisine: $('#pCuisine').value, price: +$('#pPrice').value, lat: draft.lat, lng: draft.lng }).select('id').single();
+    if (error) throw error;
+    const author = $('#aName').value.trim(); rememberName(author);
+    const r = await sb.from('reviews').insert({ place_id: pl.id, author, rating: +$('#aRating').value, comment: $('#aComment').value.trim(), photos });
+    if (r.error) throw r.error;
+    e.target.reset(); $('#aName').value = author; draft = null; if (draftMarker) draftMarker.remove(); $('#pinStatus').textContent = 'No pin set';
+    $('#addDlg').close(); await load();
+  } catch (err) { console.error(err); st.style.color = 'var(--chili)'; st.textContent = 'Could not save. Check your connection and try again.'; }
+  $('#addSubmit').disabled = false;
+};
+
+// Add a review to an existing place
+$('#detailBody').addEventListener('submit', async e => {
+  e.preventDefault();
+  const st = $('#revStatus'); st.style.color = 'var(--sea)'; st.textContent = 'Posting...'; $('#revSubmit').disabled = true;
+  try {
+    const photos = await uploadPhotos($('#rPhotos').files);
+    const author = $('#rAuthor').value.trim(); rememberName(author); $('#aName').value = author;
+    const { error } = await sb.from('reviews').insert({ place_id: e.target.dataset.id, author, rating: +$('#rRating').value, comment: $('#rComment').value.trim(), photos });
+    if (error) throw error;
+    await load(); openDetail(e.target.dataset.id);
+  } catch (err) { console.error(err); st.style.color = 'var(--chili)'; st.textContent = 'Could not post. Try again.'; $('#revSubmit').disabled = false; }
+});
+
+load();
+</script>
+</body>
+</html>
